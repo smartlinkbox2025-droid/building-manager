@@ -1,0 +1,33 @@
+{
+  "name": "building-manager-pwa",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "browser-image-compression": "latest",
+    "dexie": "latest",
+    "file-saver": "latest",
+    "html2canvas": "latest",
+    "jspdf": "latest",
+    "jszip": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router-dom": "latest",
+    "xlsx": "latest"
+  },
+  "devDependencies": {
+    "@types/file-saver": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vite-plugin-pwa": "latest"
+  }
+}

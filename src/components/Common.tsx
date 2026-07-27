@@ -1,0 +1,6 @@
+import type { ReactNode } from 'react'
+import { FileDown, FileSpreadsheet, Plus } from 'lucide-react'
+export function PageHeader({title,onAdd,onPdf,onExcel}:{title:string,onAdd?:()=>void,onPdf?:()=>void,onExcel?:()=>void}){return <div className="page-head"><h1>{title}</h1><div className="actions">{onAdd&&<button className="primary" onClick={onAdd}><Plus size={17}/>إضافة</button>}{onExcel&&<button onClick={onExcel}><FileSpreadsheet size={17}/>Excel</button>}{onPdf&&<button onClick={onPdf}><FileDown size={17}/>PDF</button>}</div></div>}
+export function Modal({open,title,children,onClose}:{open:boolean,title:string,children:ReactNode,onClose:()=>void}){if(!open)return null;return <div className="modal-back" onMouseDown={onClose}><div className="modal" onMouseDown={e=>e.stopPropagation()}><div className="modal-title"><h3>{title}</h3><button onClick={onClose}>×</button></div>{children}</div></div>}
+export function Empty({text='لا توجد بيانات بعد'}:{text?:string}){return <div className="empty">{text}</div>}
+export function Money({value}:{value:number}){return <>{new Intl.NumberFormat('ar-SA',{style:'currency',currency:'SAR'}).format(value||0)}</>}

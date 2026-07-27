@@ -1,0 +1,2 @@
+import React from 'react';import ReactDOM from 'react-dom/client';import App from './App';import './styles.css';import { ensureSettings } from './db/database';import { registerSW } from 'virtual:pwa-register';
+ensureSettings();registerSW({onNeedRefresh(){if(confirm('يتوفر تحديث جديد. إعادة التحميل؟'))location.reload()}});ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>)
