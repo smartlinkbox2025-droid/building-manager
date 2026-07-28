@@ -1,33 +1,36 @@
 {
   "name": "building-manager-pwa",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "validate": "node scripts/validate-project.mjs",
+    "typecheck": "tsc -b --pretty false",
+    "build": "npm run validate && tsc -b && vite build",
+    "preview": "vite preview",
+    "check": "npm run validate && npm run typecheck && vite build"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "browser-image-compression": "latest",
-    "dexie": "latest",
-    "file-saver": "latest",
-    "html2canvas": "latest",
-    "jspdf": "latest",
-    "jszip": "latest",
-    "lucide-react": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "react-router-dom": "latest",
-    "xlsx": "latest"
+    "browser-image-compression": "^2.0.2",
+    "dexie": "^4.0.11",
+    "file-saver": "^2.0.5",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.2",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@types/file-saver": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "typescript": "latest",
-    "vite": "latest",
-    "vite-plugin-pwa": "latest"
+    "@types/file-saver": "^2.0.7",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.5",
+    "vite-plugin-pwa": "^0.21.1"
   }
 }

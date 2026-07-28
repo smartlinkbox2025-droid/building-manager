@@ -1,2 +1,27 @@
-import React from 'react';import ReactDOM from 'react-dom/client';import App from './App';import './styles.css';import { ensureSettings } from './db/database';import { registerSW } from 'virtual:pwa-register';
-ensureSettings();registerSW({onNeedRefresh(){if(confirm('يتوفر تحديث جديد. إعادة التحميل؟'))location.reload()}});ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>)
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { registerSW } from 'virtual:pwa-register'
+import App from './App'
+import ErrorBoundary from './components/ErrorBoundary'
+import './styles.css'
+import { ensureSettings } from './db/database'
+
+void ensureSettings().catch(error => console.error('تعذر تهيئة الإعدادات:', error))
+
+const updateSW = registerSW({
+  immediate: true,
+  onNeedRefresh(){
+    const accepted = window.confirm('يتوفر إصدار جديد من التطبيق. هل تريد تحديثه الآن؟ لن تتأثر بياناتك المحلية.')
+    if (accepted) void updateSW(true)
+  },
+  onOfflineReady(){
+    console.info('أصبح التطبيق جاهزاً للعمل دون اتصال.')
+  },
+  onRegisterError(error){
+    console.error('تعذر تسجيل Service Worker:', error)
+  }
+})
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode><ErrorBoundary><App/></ErrorBoundary></React.StrictMode>
+)
