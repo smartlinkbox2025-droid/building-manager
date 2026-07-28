@@ -1,4 +1,4 @@
-import type { Charge, ExtraCharge, Payment, PaymentStatus } from '../types/models'
+import type { Charge, Expense, ExtraCharge, Payment, PaymentStatus } from '../types/models'
 
 export function sumActivePayments(payments: Payment[]): number {
   return payments
@@ -34,4 +34,16 @@ export function validateFinancialAmount(amount: number, allowZero = false): void
   if (amount < 0 || (!allowZero && amount === 0)) {
     throw new Error(allowZero ? 'لا يمكن إدخال قيمة سالبة' : 'يجب أن تكون القيمة أكبر من صفر')
   }
+}
+
+export function getExpensePaidAmount(expense: Expense): number {
+  if (expense.cancelled || expense.active === false) return 0
+  if (Number.isFinite(expense.paidAmount)) return Math.min(Math.max(0, Number(expense.paidAmount)), Math.max(0, expense.amount))
+  if (expense.paymentStatus === 'مستحق') return 0
+  if (expense.paymentStatus === 'مدفوع جزئياً') return 0
+  return Math.max(0, expense.amount)
+}
+
+export function getExpenseOutstandingAmount(expense: Expense): number {
+  return Math.max(0, Math.max(0, expense.amount) - getExpensePaidAmount(expense))
 }

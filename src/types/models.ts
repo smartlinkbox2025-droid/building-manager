@@ -120,6 +120,7 @@ export interface Expense extends BaseEntity {
   method: string
   invoiceNo: string
   paymentStatus?: string
+  paidAmount?: number
   costCenter?: string
   notes: string
   cancelled: boolean
@@ -232,6 +233,9 @@ export interface AppSettings {
   address: string
   phone: string
   email?: string
+  buildingNotes?: string
+  logoAttachmentId?: ID
+  buildingImageAttachmentId?: ID
   currency: string
   currencySymbol: string
   decimalPlaces?: number

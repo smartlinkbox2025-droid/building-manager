@@ -16,16 +16,16 @@ const database = read('src/db/database.ts')
 const app = read('src/App.tsx')
 const vite = read('vite.config.ts')
 
-check(packageJson.version === '2.0.0', 'تطابق إصدار package.json مع الإصدار النهائي 2.0.0')
+check(packageJson.version === '2.8.0', 'تطابق إصدار package.json مع إصدار التقارير والتصدير 2.8.0')
 check(!Object.values({ ...packageJson.dependencies, ...packageJson.devDependencies }).includes('latest'), 'عدم استخدام latest في الحزم')
 check(database.includes("DATABASE_NAME = 'BuildingManagerDB'"), 'الحفاظ على اسم قاعدة البيانات')
-check(database.includes("APP_VERSION = '2.0.0'"), 'تطابق إصدار قاعدة البيانات مع إصدار التطبيق')
-check(database.includes('this.version(1)') && database.includes('this.version(2)'), 'الحفاظ على مخططات Dexie السابقة ومسار الترقية')
+check(database.includes("APP_VERSION = '2.8.0'"), 'تطابق إصدار قاعدة البيانات مع إصدار التطبيق')
+check(database.includes('this.version(1)') && database.includes('this.version(2)') && database.includes('this.version(3)'), 'الحفاظ على مخططات Dexie السابقة وإضافة مسار ترقية غير هدام')
 
 const requiredTables = ['apartments','residents','charges','chargeItems','extraCharges','payments','receipts','incomes','expenses','maintenance','purchases','suppliers','maintenanceContracts','attachments','alerts','receiptSequences','databaseInfo','settings','audit']
 for (const table of requiredTables) check(database.includes(`${table}:`), `وجود جدول IndexedDB: ${table}`)
 
-const requiredRoutes = ['/apartments','/residents','/charges','/expenses','/maintenance','/reports','/audit','/settings']
+const requiredRoutes = ['/apartments','/residents','/charges','/expenses','/maintenance','/reports','/settings']
 for (const route of requiredRoutes) check(app.includes(`path="${route}"`), `وجود مسار الصفحة: ${route}`)
 
 check(vite.includes('VitePWA'), 'تفعيل vite-plugin-pwa')

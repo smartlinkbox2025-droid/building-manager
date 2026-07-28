@@ -54,47 +54,48 @@ export async function createPayment(input: CreatePaymentInput): Promise<Payment>
   }
 
   const paymentYear = Number(input.date.slice(0, 4)) || new Date().getFullYear()
-  const receiptNo = await nextReceiptNumber(settings, apartment, paymentYear)
   const timestamp = now()
-  const payment: Payment = {
-    id: uid(),
-    chargeId: charge.id,
-    apartmentId: charge.apartmentId,
-    amount: input.amount,
-    date: input.date,
-    method: input.method.trim(),
-    receiptNo,
-    reference: input.reference?.trim() || '',
-    notes: input.notes?.trim() || '',
-    cancelled: false,
-    attachmentId: input.attachmentId,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    active: true,
-    status: 'active'
-  }
-
   const paidAfter = paidBefore + input.amount
   const balanceAfter = getChargeBalance(requiredAmount, paidAfter)
   const newStatus = getPaymentStatus(requiredAmount, paidAfter)
-  const receipt = createReceiptSnapshot({
-    settings,
-    apartment,
-    charge,
-    payment,
-    residentName: resident?.name,
-    requiredAmount,
-    totalPaid: paidAfter,
-    remainingAmount: balanceAfter
-  })
+  let payment: Payment | undefined
 
-  await db.transaction('rw', db.payments, db.receipts, db.charges, db.audit, async () => {
+  await db.transaction('rw', db.receiptSequences, db.payments, db.receipts, db.charges, db.audit, async () => {
+    const receiptNo = await nextReceiptNumber(settings, apartment, paymentYear)
+    payment = {
+      id: uid(),
+      chargeId: charge.id,
+      apartmentId: charge.apartmentId,
+      amount: input.amount,
+      date: input.date,
+      method: input.method.trim(),
+      receiptNo,
+      reference: input.reference?.trim() || '',
+      notes: input.notes?.trim() || '',
+      cancelled: false,
+      attachmentId: input.attachmentId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      active: true,
+      status: 'active'
+    }
+    const receipt = createReceiptSnapshot({
+      settings,
+      apartment,
+      charge,
+      payment,
+      residentName: resident?.name,
+      requiredAmount,
+      totalPaid: paidAfter,
+      remainingAmount: balanceAfter
+    })
     await db.payments.add(payment)
     await db.receipts.add(receipt)
     await db.charges.update(charge.id, { status: statusLabel(newStatus), updatedAt: timestamp })
     await audit('payments', payment.id, 'create', `تسجيل دفعة وإصدار الإيصال ${receiptNo}`, undefined, payment)
   })
 
+  if (!payment) throw new Error('تعذر إكمال عملية الدفع')
   return payment
 }
 

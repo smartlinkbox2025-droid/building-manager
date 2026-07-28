@@ -9,6 +9,13 @@ export interface SaveAttachmentInput {
   category?: string
 }
 
+function storageError(error: unknown): Error {
+  if (error instanceof DOMException && ['QuotaExceededError', 'NS_ERROR_DOM_QUOTA_REACHED'].includes(error.name)) {
+    return new Error('مساحة التخزين المحلية غير كافية. أنشئ نسخة احتياطية واحذف الملفات غير الضرورية.')
+  }
+  return error instanceof Error ? error : new Error('تعذر حفظ المرفق')
+}
+
 export async function saveAttachment(input: SaveAttachmentInput): Promise<Attachment> {
   const settings = await db.settings.get('main')
   const maxSizeMb = settings?.maxAttachmentSizeMb ?? 10
@@ -44,11 +51,17 @@ export async function saveAttachment(input: SaveAttachmentInput): Promise<Attach
     status: 'active'
   }
 
-  await db.attachments.add(attachment)
-  await audit('attachments', attachment.id, 'create', `رفع المرفق ${attachment.fileName}`, undefined, {
-    ...attachment,
-    blob: `[Blob ${attachment.sizeAfter} bytes]`
-  })
+  try {
+    await db.transaction('rw', db.attachments, db.audit, async () => {
+      await db.attachments.add(attachment)
+      await audit('attachments', attachment.id, 'create', `رفع المرفق ${attachment.fileName}`, undefined, {
+        ...attachment,
+        blob: `[Blob ${attachment.sizeAfter} bytes]`
+      })
+    })
+  } catch (error) {
+    throw storageError(error)
+  }
   return attachment
 }
 

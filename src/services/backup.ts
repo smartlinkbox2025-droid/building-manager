@@ -11,6 +11,7 @@ export const dataTableNames = [
 
 type TableName = (typeof dataTableNames)[number]
 type BackupData = Record<TableName, unknown[]>
+type BackupAttachmentMetadata = Omit<Attachment, 'blob'> & { archivePath?: string }
 export type RestoreMode = 'replace' | 'merge'
 export interface BackupPreview { fileName:string; appVersion:string; schemaVersion:number; createdAt:string; formatVersion:number; attachmentCount:number; counts:Record<string,number> }
 
@@ -21,8 +22,8 @@ async function readBackup(file: File) {
   if (!metadataFile || !dataFile) throw new Error('ملف النسخة الاحتياطية غير صالح أو ناقص')
   const metadata = JSON.parse(await metadataFile.async('string')) as Record<string, unknown>
   const formatVersion = Number(metadata.formatVersion || 0)
-  if (!formatVersion || formatVersion > 2) throw new Error('إصدار النسخة الاحتياطية غير مدعوم')
-  const parsed = JSON.parse(await dataFile.async('string')) as Partial<BackupData> & { attachments?: Omit<Attachment, 'blob'>[] }
+  if (!formatVersion || formatVersion > 3) throw new Error('إصدار النسخة الاحتياطية غير مدعوم')
+  const parsed = JSON.parse(await dataFile.async('string')) as Partial<BackupData> & { attachments?: BackupAttachmentMetadata[] }
   if (!Array.isArray(parsed.settings) || !Array.isArray(parsed.apartments)) throw new Error('بنية بيانات النسخة الاحتياطية غير صحيحة')
   return { zip, metadata, parsed, formatVersion }
 }
@@ -50,13 +51,26 @@ export async function createBackup() {
   for (const tableName of dataTableNames) data[tableName] = await db.table(tableName).toArray()
 
   const attachments = await db.attachments.toArray()
-  const attachmentMetadata = attachments.map(({ blob: _blob, ...metadata }) => metadata)
-  for (const attachment of attachments) zip.file(`attachments/${attachment.id}`, attachment.blob)
+  const folderFor = (attachment: Attachment) => {
+    if (attachment.entityType === 'settings-logo' || attachment.entityType === 'settings-building') return 'building-assets'
+    if (attachment.entityType === 'payment') return 'receipts'
+    if (attachment.entityType === 'expense' || attachment.entityType === 'purchase' || attachment.entityType === 'income') return 'invoices'
+    if (attachment.entityType === 'maintenance' || attachment.entityType === 'maintenanceContract') return 'maintenance'
+    return 'attachments'
+  }
+  const attachmentMetadata: BackupAttachmentMetadata[] = []
+  for (const attachment of attachments) {
+    const archivePath = `${folderFor(attachment)}/${attachment.id}-${attachment.fileName.replace(/[\\/:*?"<>|]/g, '_')}`
+    const { blob: _blob, ...metadata } = attachment
+    attachmentMetadata.push({ ...metadata, archivePath })
+    zip.file(archivePath, attachment.blob)
+  }
 
   zip.file('data.json', JSON.stringify({ ...data, attachments: attachmentMetadata }, null, 2))
   zip.file('metadata.json', JSON.stringify({
     app: 'Building Manager PWA', appVersion: APP_VERSION, schemaVersion: DATABASE_SCHEMA_VERSION,
-    createdAt, attachmentCount: attachments.length, formatVersion: 2
+    createdAt, attachmentCount: attachments.length, formatVersion: 3,
+    folders: ['building-assets', 'receipts', 'invoices', 'maintenance', 'attachments']
   }, null, 2))
 
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
@@ -71,9 +85,10 @@ export async function restoreBackup(file: File, mode: RestoreMode = 'replace') {
   const { zip, metadata, parsed } = await readBackup(file)
   const restoredAttachments: Attachment[] = []
   for (const item of parsed.attachments || []) {
-    const attachmentFile = zip.file(`attachments/${item.id}`)
+    const attachmentFile = (item.archivePath && zip.file(item.archivePath)) || zip.file(`attachments/${item.id}`)
     if (!attachmentFile) throw new Error(`المرفق ${item.fileName} غير موجود داخل النسخة`)
-    restoredAttachments.push({ ...item, blob: await attachmentFile.async('blob') })
+    const { archivePath: _archivePath, ...metadata } = item
+    restoredAttachments.push({ ...metadata, blob: await attachmentFile.async('blob') })
   }
 
   const transactionTables = [...dataTableNames.map(name => db.table(name)), db.attachments]
@@ -98,7 +113,6 @@ export async function restoreBackup(file: File, mode: RestoreMode = 'replace') {
 }
 
 export async function deleteAllApplicationData() {
-  const settings = await db.settings.get('main')
   await audit('system', 'all-data', 'delete-all-request', 'طلب حذف جميع بيانات التطبيق', undefined, { requestedAt: now() })
   const tables = [...dataTableNames.map(name => db.table(name)), db.attachments]
   await db.transaction('rw', tables, async () => {
@@ -112,5 +126,5 @@ export async function deleteAllApplicationData() {
   localStorage.clear()
   sessionStorage.clear()
   await ensureSettings()
-  if (settings) await db.settings.update('main', { buildingName: settings.buildingName })
+  await audit('system', 'all-data', 'delete-all-completed', 'اكتمل حذف جميع بيانات التطبيق وتهيئة إعدادات فارغة', undefined, { completedAt: now() })
 }

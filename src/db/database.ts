@@ -22,8 +22,8 @@ import type {
 } from '../types/models'
 
 export const DATABASE_NAME = 'BuildingManagerDB'
-export const DATABASE_SCHEMA_VERSION = 2
-export const APP_VERSION = '2.0.0'
+export const DATABASE_SCHEMA_VERSION = 3
+export const APP_VERSION = '2.8.0'
 
 export class BuildingDB extends Dexie {
   apartments!: Table<Apartment, string>
@@ -107,6 +107,35 @@ export class BuildingDB extends Dexie {
         item.overdueAlertDays ??= 5
       })
     })
+
+    this.version(3).stores({
+      apartments: 'id, &number, floor, active, status',
+      residents: 'id, apartmentId, name, phone, active, status',
+      charges: 'id, apartmentId, [apartmentId+year+month], [year+month], status, active',
+      chargeItems: 'id, chargeId, active, cancelled',
+      extraCharges: 'id, chargeId, apartmentId, [apartmentId+year+month], active, cancelled',
+      payments: 'id, chargeId, apartmentId, date, &receiptNo, cancelled, active',
+      receipts: 'id, paymentId, chargeId, apartmentId, &receiptNo, issuedAt',
+      incomes: 'id, date, category, cancelled, active',
+      expenses: 'id, date, category, supplierId, cancelled, active',
+      maintenance: 'id, status, dueDate, nextDate, active',
+      purchases: 'id, date, category, supplierId, cancelled, active',
+      suppliers: 'id, name, type, active',
+      maintenanceContracts: 'id, contractNo, supplierId, endDate, active',
+      attachments: 'id, entityType, entityId, [entityType+entityId], createdAt, active',
+      alerts: 'id, type, dueDate, read, entityType, entityId, active',
+      receiptSequences: 'id, year, apartmentNumber, prefix',
+      databaseInfo: 'id',
+      settings: 'id',
+      audit: 'id, entity, entityId, action, createdAt'
+    }).upgrade(async transaction => {
+      await transaction.table('settings').toCollection().modify(item => {
+        item.buildingNotes ??= ''
+        item.openingBalanceDate ??= new Date().toISOString().slice(0, 10)
+        item.decimalPlaces ??= 2
+        item.allowedFileTypes ??= ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+      })
+    })
   }
 }
 
@@ -123,6 +152,7 @@ export async function ensureSettings() {
       address: '',
       phone: '',
       email: '',
+      buildingNotes: '',
       currency: 'SAR',
       currencySymbol: 'ر.س',
       decimalPlaces: 2,

@@ -1,0 +1,7 @@
+node_modules/
+.npm-cache/
+dist/
+*.log
+*.tsbuildinfo
+.wrangler/
+.env*

@@ -119,6 +119,22 @@ export async function refreshAlerts(): Promise<AlertSnapshot> {
     ))
   }
 
+  if (navigator.storage?.estimate) {
+    const estimate = await navigator.storage.estimate()
+    const usage = estimate.usage || 0
+    const quota = estimate.quota || 0
+    const usageRatio = quota ? usage / quota : 0
+    if (usageRatio >= 0.8) {
+      generated.push(makeAlert(
+        'storage-quota',
+        'مساحة التخزين تقترب من الامتلاء',
+        `يستخدم التطبيق ${Math.round(usageRatio * 100)}٪ من مساحة التخزين المتاحة. أنشئ نسخة احتياطية واحذف المرفقات غير اللازمة.`,
+        'settings',
+        'main'
+      ))
+    }
+  }
+
   for (const alert of generated) alert.read = previousRead.get(alert.id) ?? false
 
   await db.transaction('rw', db.alerts, async () => {

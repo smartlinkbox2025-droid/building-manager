@@ -4,6 +4,8 @@ import { db } from '../db/database'
 import { Money } from '../components/Common'
 import { markAlertRead, refreshAlerts, requestLocalNotifications, type AlertSnapshot } from '../services/alerts'
 import type { Alert, AppSettings, Expense, Maintenance, MaintenanceContract, Payment, Purchase } from '../types/models'
+import BuildingAsset from '../components/BuildingAsset'
+import { getExpenseOutstandingAmount, getExpensePaidAmount } from '../services/finance'
 
 type DashboardData = {
   settings?: AppSettings
@@ -11,6 +13,7 @@ type DashboardData = {
   currentBalance: number
   monthlyIncome: number
   monthlyExpenses: number
+  outstandingExpenses: number
   subscriptionsCollected: number
   totalDue: number
   apartmentCount: number
@@ -29,7 +32,7 @@ type DashboardData = {
 }
 
 const emptyAlerts: AlertSnapshot = { alerts: [], unreadCount: 0, overdueCount: 0, maintenanceCount: 0, contractCount: 0, backupWarning: false }
-const initialData: DashboardData = { opening: 0, currentBalance: 0, monthlyIncome: 0, monthlyExpenses: 0, subscriptionsCollected: 0, totalDue: 0, apartmentCount: 0, paidCount: 0, partialCount: 0, unpaidCount: 0, overdueApartmentNumbers: [], collectionRate: 0, recentPayments: [], recentExpenses: [], recentPurchases: [], upcomingMaintenance: [], expiringContracts: [], alerts: emptyAlerts, monthlyTrend: [] }
+const initialData: DashboardData = { opening: 0, currentBalance: 0, monthlyIncome: 0, monthlyExpenses: 0, outstandingExpenses: 0, subscriptionsCollected: 0, totalDue: 0, apartmentCount: 0, paidCount: 0, partialCount: 0, unpaidCount: 0, overdueApartmentNumbers: [], collectionRate: 0, recentPayments: [], recentExpenses: [], recentPurchases: [], upcomingMaintenance: [], expiringContracts: [], alerts: emptyAlerts, monthlyTrend: [] }
 const active = <T extends { active: boolean; cancelled?: boolean }>(items: T[]) => items.filter(item => item.active !== false && !item.cancelled)
 const sameMonth = (date: string, year: number, month: number) => { const value = new Date(date); return value.getFullYear() === year && value.getMonth() + 1 === month }
 
@@ -57,20 +60,21 @@ export default function Dashboard() {
       const currentCharges = chargeStats.filter(item => item.charge.year === year && item.charge.month === month)
       const subscriptionsCollected = payments.reduce((sum, item) => sum + item.amount, 0)
       const otherIncome = incomes.reduce((sum, item) => sum + item.amount, 0)
-      const allExpenses = expenses.reduce((sum, item) => sum + item.amount, 0) + purchases.reduce((sum, item) => sum + item.total, 0)
+      const allExpenses = expenses.reduce((sum, item) => sum + getExpensePaidAmount(item), 0) + purchases.reduce((sum, item) => sum + item.total, 0)
+      const outstandingExpenses = expenses.reduce((sum, item) => sum + getExpenseOutstandingAmount(item), 0)
       const monthlyIncome = payments.filter(item => sameMonth(item.date, year, month)).reduce((sum, item) => sum + item.amount, 0) + incomes.filter(item => sameMonth(item.date, year, month)).reduce((sum, item) => sum + item.amount, 0)
-      const monthlyExpenses = expenses.filter(item => sameMonth(item.date, year, month)).reduce((sum, item) => sum + item.amount, 0) + purchases.filter(item => sameMonth(item.date, year, month)).reduce((sum, item) => sum + item.total, 0)
+      const monthlyExpenses = expenses.filter(item => sameMonth(item.date, year, month)).reduce((sum, item) => sum + getExpensePaidAmount(item), 0) + purchases.filter(item => sameMonth(item.date, year, month)).reduce((sum, item) => sum + item.total, 0)
       const apartmentMap = new Map(apartments.map(apartment => [apartment.id, apartment.number]))
       const monthLabels = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر']
       const monthlyTrend = Array.from({ length: 6 }, (_, index) => {
         const d = new Date(year, month - 1 - (5 - index), 1); const y = d.getFullYear(); const m = d.getMonth() + 1
-        return { label: monthLabels[m - 1], income: payments.filter(item => sameMonth(item.date, y, m)).reduce((s, item) => s + item.amount, 0) + incomes.filter(item => sameMonth(item.date, y, m)).reduce((s, item) => s + item.amount, 0), expense: expenses.filter(item => sameMonth(item.date, y, m)).reduce((s, item) => s + item.amount, 0) + purchases.filter(item => sameMonth(item.date, y, m)).reduce((s, item) => s + item.total, 0) }
+        return { label: monthLabels[m - 1], income: payments.filter(item => sameMonth(item.date, y, m)).reduce((s, item) => s + item.amount, 0) + incomes.filter(item => sameMonth(item.date, y, m)).reduce((s, item) => s + item.amount, 0), expense: expenses.filter(item => sameMonth(item.date, y, m)).reduce((s, item) => s + getExpensePaidAmount(item), 0) + purchases.filter(item => sameMonth(item.date, y, m)).reduce((s, item) => s + item.total, 0) }
       })
       const totalRequired = currentCharges.reduce((sum, item) => sum + item.required, 0)
       const totalPaid = currentCharges.reduce((sum, item) => sum + item.paid, 0)
       setData({
         settings, opening: settings?.openingBalance || 0, currentBalance: (settings?.openingBalance || 0) + subscriptionsCollected + otherIncome - allExpenses,
-        monthlyIncome, monthlyExpenses, subscriptionsCollected, totalDue: chargeStats.reduce((sum, item) => sum + item.remaining, 0), apartmentCount: apartments.filter(item => item.active !== false).length,
+        monthlyIncome, monthlyExpenses, outstandingExpenses, subscriptionsCollected, totalDue: chargeStats.reduce((sum, item) => sum + item.remaining, 0), apartmentCount: apartments.filter(item => item.active !== false).length,
         paidCount: currentCharges.filter(item => item.required > 0 && item.paid >= item.required).length, partialCount: currentCharges.filter(item => item.paid > 0 && item.paid < item.required).length, unpaidCount: currentCharges.filter(item => item.paid === 0 && item.required > 0).length,
         overdueApartmentNumbers: alerts.alerts.filter(item => item.type === 'overdue-charge').map(item => apartmentMap.get(charges.find(charge => charge.id === item.entityId)?.apartmentId || '') || '').filter(Boolean),
         collectionRate: totalRequired ? Math.min(100, totalPaid / totalRequired * 100) : 0,
@@ -87,12 +91,14 @@ export default function Dashboard() {
 
   if (loading) return <div className="panel loading-state">جاري تحميل مؤشرات العمارة...</div>
   return <>
-    <div className="hero dashboard-hero"><div><h1>{data.settings?.buildingName || 'لوحة التحكم'}</h1><p>{data.settings?.address || 'ملخص مالي وإداري مباشر من قاعدة البيانات المحلية'}</p></div><button onClick={() => void load()}><RefreshCw size={17}/>تحديث</button></div>
+    <div className="hero dashboard-hero"><div className="building-identity"><BuildingAsset attachmentId={data.settings?.logoAttachmentId} alt="شعار العمارة" className="building-logo"/><div><h1>{data.settings?.buildingName || 'لوحة التحكم'}</h1><p>{data.settings?.address || 'ملخص مالي وإداري مباشر من قاعدة البيانات المحلية'}</p><small>{new Date().toLocaleDateString('ar-SA-u-ca-gregory-nu-latn',{dateStyle:'full'})}</small></div></div><button onClick={() => void load()}><RefreshCw size={17}/>تحديث</button></div>
     {error && <div className="error-message">{error}</div>}
     <div className="cards kpi-cards">
       <Kpi title="رصيد الصندوق الحالي" value={<Money value={data.currentBalance}/>} icon={<Wallet/>}/>
+      <Kpi title="الرصيد الافتتاحي" value={<Money value={data.opening}/>} icon={<Wallet/>}/>
       <Kpi title="إيرادات الشهر" value={<Money value={data.monthlyIncome}/>} icon={<TrendingUp/>}/>
       <Kpi title="مصروفات الشهر" value={<Money value={data.monthlyExpenses}/>} icon={<TrendingDown/>}/>
+      <Kpi title="مصروفات مستحقة" value={<Money value={data.outstandingExpenses}/>} icon={<FileWarning/>}/>
       <Kpi title="إجمالي المتأخرات" value={<Money value={data.totalDue}/>} icon={<FileWarning/>}/>
       <Kpi title="مسدد بالكامل" value={data.paidCount} icon={<CheckCircle2/>}/>
       <Kpi title="مدفوع جزئياً" value={data.partialCount} icon={<Clock3/>}/>
@@ -109,7 +115,7 @@ export default function Dashboard() {
 
     <div className="dashboard-grid three">
       <Recent title="آخر الدفعات" rows={data.recentPayments.map(item => [item.date, item.receiptNo, item.amount])}/>
-      <Recent title="آخر المصروفات" rows={data.recentExpenses.map(item => [item.date, item.description, item.amount])}/>
+      <Recent title="آخر المصروفات المدفوعة" rows={data.recentExpenses.map(item => [item.date, item.description, getExpensePaidAmount(item)])}/>
       <Recent title="آخر المشتريات" rows={data.recentPurchases.map(item => [item.date, item.item, item.total])}/>
     </div>
     <div className="dashboard-grid">
